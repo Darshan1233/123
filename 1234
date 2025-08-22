@@ -1,0 +1,761 @@
+Awesome—let’s build the full Angular (NgModule-based) CRUD app for “Hotel Table Bookings” with:
+
+Login page (admin)
+
+Protected booking list + Add/Edit form
+
+Bootstrap for layout
+
+ngx-toastr for notifications
+
+JSON Server as backend
+
+Auth service + Auth guard
+
+No standalone APIs (classic NgModules)
+
+
+I’ll give you: exact CLI commands, project structure, every file’s code (drop-in), and the db.json for JSON Server.
+
+
+---
+
+1) Create & set up the project
+
+# Angular project (no standalone)
+ng new hotel-bookings --no-standalone --routing --style=scss
+cd hotel-bookings
+
+# Libraries
+npm i bootstrap@5 ngx-toastr @angular/animations
+npm i -D json-server
+
+# Add Bootstrap & Toastr styles
+
+Edit angular.json → projects.hotel-bookings.architect.build.options.styles:
+
+"styles": [
+  "node_modules/bootstrap/dist/css/bootstrap.min.css",
+  "node_modules/ngx-toastr/toastr.css",
+  "src/styles.scss"
+]
+
+
+---
+
+2) Project structure (generate)
+
+# core/auth
+ng g m core
+ng g s core/auth
+ng g g core/auth --name=auth  # (we’ll replace with a Guard class below)
+
+# features/bookings
+ng g m features/bookings
+ng g c features/bookings/bookings-list --flat=false
+ng g c features/bookings/booking-form --flat=false
+
+# auth & layout
+ng g c auth/login
+ng g c layout/header
+
+# services & models
+ng g s features/bookings/booking
+ng g class shared/models/booking --type=model
+ng g class shared/models/user --type=model
+
+
+---
+
+3) JSON Server
+
+Create db.json in project root:
+
+{
+  "users": [
+    { "id": 1, "username": "admin", "password": "admin123", "name": "Admin User" }
+  ],
+  "bookings": [
+    {
+      "id": 1,
+      "tableName": "Table 1",
+      "bookingDateTime": "2025-08-25T19:30",
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "john@example.com",
+      "gender": "Male",
+      "guests": 4
+    }
+  ],
+  "tables": [
+    { "id": 1, "name": "Table 1" },
+    { "id": 2, "name": "Table 2" },
+    { "id": 3, "name": "VIP Booth" }
+  ]
+}
+
+Add script to package.json:
+
+"scripts": {
+  "start": "ng serve",
+  "server": "json-server --watch db.json --port 3000"
+}
+
+Run in two terminals:
+
+npm run server
+npm start
+
+
+---
+
+4) Environment
+
+src/environments/environment.ts
+
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:3000'
+};
+
+
+---
+
+5) Models
+
+src/app/shared/models/booking.model.ts
+
+export interface Booking {
+  id?: number;
+  tableName: string;              // from dropdown
+  bookingDateTime: string;        // ISO like 2025-08-25T19:30
+  firstName: string;
+  lastName: string;
+  email: string;
+  gender: 'Male' | 'Female' | 'Other';
+  guests: number;
+}
+
+src/app/shared/models/user.model.ts
+
+export interface User {
+  id: number;
+  username: string;
+  password: string;
+  name: string;
+}
+
+
+---
+
+6) Core module & Auth
+
+src/app/core/core.module.ts
+
+import { NgModule } from '@angular/core';
+import { CommonModule } from '@angular/common';
+
+@NgModule({
+  declarations: [],
+  imports: [CommonModule]
+})
+export class CoreModule {}
+
+src/app/core/auth.service.ts
+
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../environments/environment';
+import { map, of, tap } from 'rxjs';
+
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+  private readonly TOKEN_KEY = 'hb_token';
+  private readonly NAME_KEY = 'hb_name';
+
+  constructor(private http: HttpClient) {}
+
+  login(username: string, password: string) {
+    // JSON-server “auth”
+    return this.http.get<any[]>(`${environment.apiUrl}/users`, {
+      params: { username, password }
+    }).pipe(
+      map(users => users[0]),
+      tap(user => {
+        if (user) {
+          // fake token
+          localStorage.setItem(this.TOKEN_KEY, 'token_' + Date.now());
+          localStorage.setItem(this.NAME_KEY, user.name || username);
+        }
+      })
+    );
+  }
+
+  logout() {
+    localStorage.removeItem(this.TOKEN_KEY);
+    localStorage.removeItem(this.NAME_KEY);
+  }
+
+  isLoggedIn(): boolean {
+    return !!localStorage.getItem(this.TOKEN_KEY);
+  }
+
+  meName(): string | null {
+    return localStorage.getItem(this.NAME_KEY);
+  }
+}
+
+src/app/core/auth.guard.ts
+
+import { Injectable } from '@angular/core';
+import { CanActivate, Router, UrlTree } from '@angular/router';
+import { AuthService } from './auth.service';
+
+@Injectable({ providedIn: 'root' })
+export class AuthGuard implements CanActivate {
+  constructor(private auth: AuthService, private router: Router) {}
+
+  canActivate(): boolean | UrlTree {
+    return this.auth.isLoggedIn() ? true : this.router.parseUrl('/login');
+  }
+}
+
+
+---
+
+7) App root & routing
+
+src/app/app-routing.module.ts
+
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { LoginComponent } from './auth/login/login.component';
+import { AuthGuard } from './core/auth.guard';
+import { BookingsListComponent } from './features/bookings/bookings-list/bookings-list.component';
+import { BookingFormComponent } from './features/bookings/booking-form/booking-form.component';
+
+const routes: Routes = [
+  { path: 'login', component: LoginComponent },
+  {
+    path: '',
+    canActivate: [AuthGuard],
+    children: [
+      { path: '', redirectTo: 'bookings', pathMatch: 'full' },
+      { path: 'bookings', component: BookingsListComponent },
+      { path: 'bookings/new', component: BookingFormComponent },
+      { path: 'bookings/:id', component: BookingFormComponent }
+    ]
+  },
+  { path: '**', redirectTo: '' }
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule {}
+
+src/app/app.module.ts
+
+import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { HttpClientModule } from '@angular/common/http';
+import { ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { ToastrModule } from 'ngx-toastr';
+
+import { AppRoutingModule } from './app-routing.module';
+import { AppComponent } from './app.component';
+import { CoreModule } from './core/core.module';
+
+import { LoginComponent } from './auth/login/login.component';
+import { HeaderComponent } from './layout/header/header.component';
+import { BookingsModule } from './features/bookings/bookings.module';
+
+@NgModule({
+  declarations: [
+    AppComponent,
+    LoginComponent,
+    HeaderComponent
+  ],
+  imports: [
+    BrowserModule,
+    BrowserAnimationsModule,
+    HttpClientModule,
+    FormsModule,
+    ReactiveFormsModule,
+    CoreModule,
+    BookingsModule,
+    AppRoutingModule,
+    ToastrModule.forRoot({ positionClass: 'toast-bottom-right' })
+  ],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }
+
+src/app/app.component.html
+
+<app-header></app-header>
+<div class="container my-4">
+  <router-outlet></router-outlet>
+</div>
+<footer class="text-center py-3 text-muted">
+  © {{ new Date().getFullYear() }} Hotel Admin
+</footer>
+
+
+---
+
+8) Header & Login
+
+src/app/layout/header/header.component.ts
+
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '../../core/auth.service';
+
+@Component({
+  selector: 'app-header',
+  templateUrl: './header.component.html'
+})
+export class HeaderComponent {
+  constructor(public auth: AuthService, private router: Router) {}
+  logout() {
+    this.auth.logout();
+    this.router.navigate(['/login']);
+  }
+}
+
+src/app/layout/header/header.component.html
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2" routerLink="/">
+      <img src="assets/logo.png" alt="logo" width="32" height="32">
+      <span>Hotel Bookings</span>
+    </a>
+
+    <ul class="navbar-nav ms-auto" *ngIf="auth.isLoggedIn()">
+      <li class="nav-item">
+        <a class="nav-link disabled">Hello, {{ auth.meName() }}</a>
+      </li>
+      <li class="nav-item">
+        <button class="btn btn-outline-light btn-sm ms-2" (click)="logout()">Logout</button>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+src/app/auth/login/login.component.ts
+
+import { Component } from '@angular/core';
+import { FormBuilder, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
+import { AuthService } from '../../core/auth.service';
+
+@Component({
+  selector: 'app-login',
+  templateUrl: './login.component.html'
+})
+export class LoginComponent {
+  loading = false;
+
+  form = this.fb.group({
+    username: ['', [Validators.required]],
+    password: ['', [Validators.required, Validators.minLength(6)]]
+  });
+
+  constructor(
+    private fb: FormBuilder,
+    private auth: AuthService,
+    private router: Router,
+    private toast: ToastrService
+  ) {}
+
+  submit() {
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    const { username, password } = this.form.value as any;
+    this.loading = true;
+    this.auth.login(username, password).subscribe({
+      next: (user) => {
+        this.loading = false;
+        if (user) {
+          this.toast.success('Login successful');
+          this.router.navigateByUrl('/bookings');
+        } else {
+          this.toast.error('Invalid credentials');
+        }
+      },
+      error: () => { this.loading = false; this.toast.error('Server error'); }
+    });
+  }
+}
+
+src/app/auth/login/login.component.html
+
+<div class="d-flex flex-column align-items-center">
+  <img src="assets/logo.png" width="90" class="my-3" />
+  <h2>Admin Login</h2>
+
+  <form class="card p-4 shadow-sm mt-3" style="min-width: 360px" [formGroup]="form" (ngSubmit)="submit()">
+    <div class="mb-3">
+      <label class="form-label">Username</label>
+      <input type="text" class="form-control" formControlName="username">
+      <div class="text-danger small" *ngIf="form.get('username')?.touched && form.get('username')?.invalid">
+        Username is required
+      </div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Password</label>
+      <input type="password" class="form-control" formControlName="password">
+      <div class="text-danger small" *ngIf="form.get('password')?.touched && form.get('password')?.invalid">
+        Password is required (min 6)
+      </div>
+    </div>
+    <button class="btn btn-primary w-100" [disabled]="loading">
+      {{ loading ? 'Logging in...' : 'Login' }}
+    </button>
+  </form>
+</div>
+
+
+---
+
+9) Bookings feature
+
+src/app/features/bookings/bookings.module.ts
+
+import { NgModule } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ReactiveFormsModule, FormsModule } from '@angular/forms';
+
+import { BookingsListComponent } from './bookings-list/bookings-list.component';
+import { BookingFormComponent } from './booking-form/booking-form.component';
+import { RouterModule } from '@angular/router';
+
+@NgModule({
+  declarations: [BookingsListComponent, BookingFormComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterModule]
+})
+export class BookingsModule {}
+
+src/app/features/bookings/booking.service.ts
+
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
+import { Booking } from '../../shared/models/booking.model';
+import { map, switchMap } from 'rxjs';
+
+@Injectable({ providedIn: 'root' })
+export class BookingService {
+  private base = `${environment.apiUrl}`;
+
+  constructor(private http: HttpClient) {}
+
+  getAll() {
+    return this.http.get<Booking[]>(`${this.base}/bookings?_sort=id&_order=desc`);
+  }
+
+  get(id: number) {
+    return this.http.get<Booking>(`${this.base}/bookings/${id}`);
+  }
+
+  create(b: Booking) {
+    return this.ensureNotTaken(b).pipe(
+      switchMap(_ => this.http.post<Booking>(`${this.base}/bookings`, b))
+    );
+  }
+
+  update(id: number, b: Booking) {
+    return this.ensureNotTaken(b, id).pipe(
+      switchMap(_ => this.http.put<Booking>(`${this.base}/bookings/${id}`, b))
+    );
+  }
+
+  delete(id: number) {
+    return this.http.delete(`${this.base}/bookings/${id}`);
+  }
+
+  getTables() {
+    return this.http.get<{id:number; name:string}[]>(`${this.base}/tables`);
+  }
+
+  /**
+   * Prevent double-booking: same tableName AND same bookingDateTime.
+   * JSON Server doesn't enforce uniqueness—so we check on client.
+   */
+  private ensureNotTaken(b: Booking, ignoreId?: number) {
+    let params = new HttpParams()
+      .set('tableName', b.tableName)
+      .set('bookingDateTime', b.bookingDateTime);
+    return this.http.get<Booking[]>(`${this.base}/bookings`, { params }).pipe(
+      map(list => {
+        const conflict = list.find(x => x.id !== ignoreId);
+        if (conflict) {
+          throw new Error('This table is already booked at that time.');
+        }
+        return true;
+      })
+    );
+  }
+}
+
+src/app/features/bookings/bookings-list/bookings-list.component.ts
+
+import { Component, OnInit } from '@angular/core';
+import { BookingService } from '../booking.service';
+import { Booking } from '../../../shared/models/booking.model';
+import { ToastrService } from 'ngx-toastr';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-bookings-list',
+  templateUrl: './bookings-list.component.html'
+})
+export class BookingsListComponent implements OnInit {
+  bookings: Booking[] = [];
+  loading = false;
+  search = '';
+
+  constructor(
+    private api: BookingService,
+    private toast: ToastrService,
+    private router: Router
+  ) {}
+
+  ngOnInit(): void { this.load(); }
+
+  load() {
+    this.loading = true;
+    this.api.getAll().subscribe({
+      next: data => { this.bookings = data; this.loading = false; },
+      error: _ => { this.loading = false; this.toast.error('Failed to load'); }
+    });
+  }
+
+  confirmDelete(b: Booking) {
+    if (!confirm(`Delete booking for ${b.firstName} ${b.lastName}?`)) return;
+    this.api.delete(b.id!).subscribe({
+      next: _ => { this.toast.success('Booking deleted'); this.load(); },
+      error: _ => this.toast.error('Delete failed')
+    });
+  }
+}
+
+src/app/features/bookings/bookings-list/bookings-list.component.html
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="m-0">Hotel Table Bookings</h3>
+  <a routerLink="/bookings/new" class="btn btn-primary">Add booking</a>
+</div>
+
+<input class="form-control mb-3" placeholder="Search by name, email, table..."
+       [(ngModel)]="search">
+
+<div class="table-responsive">
+  <table class="table table-striped table-bordered align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>#</th>
+        <th>Table</th>
+        <th>Date & Time</th>
+        <th>Guest</th>
+        <th>Email</th>
+        <th>Gender</th>
+        <th>Guests</th>
+        <th style="width:160px">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let b of bookings | slice:0; let i = index"
+          [hidden]="search && !(b.firstName + ' ' + b.lastName + ' ' + b.email + ' ' + b.tableName).toLowerCase().includes(search.toLowerCase())">
+        <td>{{ b.id }}</td>
+        <td>{{ b.tableName }}</td>
+        <td>{{ b.bookingDateTime | date:'medium' }}</td>
+        <td>{{ b.firstName }} {{ b.lastName }}</td>
+        <td>{{ b.email }}</td>
+        <td>{{ b.gender }}</td>
+        <td>{{ b.guests }}</td>
+        <td>
+          <a [routerLink]="['/bookings', b.id]" class="btn btn-sm btn-outline-secondary me-2">Edit</a>
+          <button class="btn btn-sm btn-outline-danger" (click)="confirmDelete(b)">Delete</button>
+        </td>
+      </tr>
+      <tr *ngIf="!loading && bookings.length === 0">
+        <td colspan="8" class="text-center text-muted">No bookings yet</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+src/app/features/bookings/booking-form/booking-form.component.ts
+
+import { Component, OnInit } from '@angular/core';
+import { FormBuilder, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { BookingService } from '../booking.service';
+import { ToastrService } from 'ngx-toastr';
+import { Booking } from '../../../shared/models/booking.model';
+
+@Component({
+  selector: 'app-booking-form',
+  templateUrl: './booking-form.component.html'
+})
+export class BookingFormComponent implements OnInit {
+  id?: number;
+  tables: {id:number; name:string}[] = [];
+  loading = false;
+
+  form = this.fb.group({
+    tableName: ['', Validators.required],
+    bookingDateTime: ['', Validators.required], // use datetime-local
+    firstName: ['', Validators.required],
+    lastName: ['', Validators.required],
+    email: ['', [Validators.required, Validators.email]],
+    gender: ['Male', Validators.required],
+    guests: [1, [Validators.required, Validators.min(1)]]
+  });
+
+  constructor(
+    private fb: FormBuilder,
+    private route: ActivatedRoute,
+    private router: Router,
+    private api: BookingService,
+    private toast: ToastrService
+  ) {}
+
+  ngOnInit(): void {
+    this.api.getTables().subscribe(t => this.tables = t);
+    this.id = Number(this.route.snapshot.paramMap.get('id')) || undefined;
+    if (this.id) {
+      this.loading = true;
+      this.api.get(this.id).subscribe({
+        next: b => { this.form.patchValue(b); this.loading = false; },
+        error: _ => { this.toast.error('Not found'); this.router.navigate(['/bookings']); }
+      });
+    }
+  }
+
+  submit() {
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    const data = this.form.value as Booking;
+
+    this.loading = true;
+    const req = this.id ? this.api.update(this.id!, data) : this.api.create(data);
+    req.subscribe({
+      next: _ => {
+        this.toast.success(this.id ? 'Booking updated' : 'Booking added');
+        this.router.navigate(['/bookings']);
+      },
+      error: err => {
+        this.loading = false;
+        const msg = err?.message?.includes('already booked')
+          ? 'Error: table already booked at that time'
+          : 'Save failed';
+        this.toast.error(msg);
+      }
+    });
+  }
+}
+
+src/app/features/bookings/booking-form/booking-form.component.html
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h4 class="card-title">{{ id ? 'Edit' : 'Add' }} Booking</h4>
+    <form [formGroup]="form" (ngSubmit)="submit()" class="row g-3 mt-1">
+
+      <div class="col-md-6">
+        <label class="form-label">Table</label>
+        <select class="form-select" formControlName="tableName">
+          <option value="" disabled>Select a table</option>
+          <option *ngFor="let t of tables" [value]="t.name">{{ t.name }}</option>
+        </select>
+        <div class="text-danger small" *ngIf="form.get('tableName')?.touched && form.get('tableName')?.invalid">
+          Table is required
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Booking Date & Time</label>
+        <input type="datetime-local" class="form-control" formControlName="bookingDateTime">
+        <div class="text-danger small" *ngIf="form.get('bookingDateTime')?.touched && form.get('bookingDateTime')?.invalid">
+          Date & time is required
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">First Name</label>
+        <input class="form-control" formControlName="firstName">
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Last Name</label>
+        <input class="form-control" formControlName="lastName">
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-control" formControlName="email">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Gender</label>
+        <select class="form-select" formControlName="gender">
+          <option>Male</option>
+          <option>Female</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">No. of Guests</label>
+        <input type="number" min="1" class="form-control" formControlName="guests">
+      </div>
+
+      <div class="col-12">
+        <button class="btn btn-primary" [disabled]="loading">
+          {{ loading ? 'Saving...' : (id ? 'Update' : 'Submit') }}
+        </button>
+        <a routerLink="/bookings" class="btn btn-outline-secondary ms-2">Cancel</a>
+      </div>
+
+      <div class="col-12 text-muted small">
+        * All fields are mandatory. Error shown if data is empty or if the table/time is already booked.
+      </div>
+    </form>
+  </div>
+</div>
+
+
+---
+
+10) Styles (optional logo)
+
+src/styles.scss
+
+body { background: #f8f9fa; }
+.card { border-radius: 1rem; }
+
+Place a simple logo at src/assets/logo.png (any small png).
+
+
+---
+
+How it works (quick checks)
+
+Login: user admin / admin123 (from db.json). On success we fake a token in localStorage, Toastr “Login successful”, redirect to /bookings.
+
+Guard protects all routes except /login.
+
+List page: shows bookings, has Add, Edit, Delete (confirm). Toastr on success/fail.
+
+Form page: all fields required. Uses <input type="datetime-local"> as date picker. Client-side uniqueness check prevents double-booking: same tableName + same bookingDateTime → Toastr error “table already booked”.
+
+Bootstrap provides responsive layout; Toastr shows messages.
+
+
+That’s the complete, working baseline. If you paste these files into a fresh project and run npm run server + npm start, you’ll have the assignment done end-to-end. If you want me to zip this or tailor UI, say the word and I’ll adjust the code accordingly.
+
