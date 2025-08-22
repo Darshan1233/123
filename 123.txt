@@ -1,0 +1,850 @@
+Got it — here’s the complete code, file-by-file, ready to paste into a fresh Angular 19 project. Follow the order. If a file doesn’t exist yet, create it at the shown path.
+
+
+---
+
+0) Commands (create project & deps)
+
+ng new hotel-booking --routing --style=scss
+cd hotel-booking
+ng add @angular/material
+npm i -D json-server
+npm i uuid
+npm i -D @types/uuid
+
+
+---
+
+1) package.json (only the scripts section you need to add/merge)
+
+{
+  "scripts": {
+    "start": "ng serve",
+    "api": "json-server --watch db.json --port 3000 --delay 500"
+  }
+}
+
+
+---
+
+2) db.json (project root)
+
+{
+  "users": [
+    { "id": 1, "email": "admin@hotel.com", "password": "Admin@123", "name": "Admin User" }
+  ],
+  "bookings": [
+    {
+      "id": "a1",
+      "tableName": "Window-1",
+      "bookingDateTime": "2025-08-25T19:30:00.000Z",
+      "guests": 4,
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "john@example.com",
+      "gender": "Male",
+      "notes": ""
+    }
+  ],
+  "tables": [
+    { "id": "Window-1" },
+    { "id": "Window-2" },
+    { "id": "Patio-1" },
+    { "id": "VIP-1" }
+  ]
+}
+
+
+---
+
+3) src/styles.scss
+
+@use '@angular/material' as mat;
+@include mat.core();
+
+$theme: mat.define-theme((
+  color: ( theme-type: light ),
+  typography: ( brand-family: 'Inter, Roboto, Arial, sans-serif')
+));
+
+:root { @include mat.all-component-themes($theme); }
+
+.container { padding: 16px; max-width: 1100px; margin: 0 auto; }
+.card { margin: 16px 0; }
+
+
+---
+
+4) src/app/app.component.ts
+
+import { Component } from '@angular/core';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html'
+})
+export class AppComponent {}
+
+
+---
+
+5) src/app/app.component.html
+
+<app-navbar></app-navbar>
+<main class="container">
+  <router-outlet></router-outlet>
+</main>
+
+
+---
+
+6) src/app/app-routing.module.ts
+
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { AuthGuard } from './core/guards/auth.guard';
+import { BookingsListComponent } from './features/bookings/bookings-list/bookings-list.component';
+import { BookingFormComponent } from './features/bookings/booking-form/booking-form.component';
+import { LoginComponent } from './features/auth/login/login.component';
+
+const routes: Routes = [
+  { path: 'login', component: LoginComponent },
+  { path: '', redirectTo: 'bookings', pathMatch: 'full' },
+  { path: 'bookings', component: BookingsListComponent, canActivate: [AuthGuard] },
+  { path: 'bookings/new', component: BookingFormComponent, canActivate: [AuthGuard] },
+  { path: 'bookings/:id/edit', component: BookingFormComponent, canActivate: [AuthGuard] },
+  { path: '**', redirectTo: 'bookings' }
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule {}
+
+
+---
+
+7) src/app/app.module.ts
+
+import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+
+import { AppRoutingModule } from './app-routing.module';
+import { AppComponent } from './app.component';
+
+import { CoreModule } from './core/core.module';
+import { SharedModule } from './shared/shared.module';
+
+import { NavbarComponent } from './layout/navbar/navbar.component';
+import { LoginComponent } from './features/auth/login/login.component';
+import { BookingsListComponent } from './features/bookings/bookings-list/bookings-list.component';
+import { BookingFormComponent } from './features/bookings/booking-form/booking-form.component';
+
+@NgModule({
+  declarations: [
+    AppComponent,
+    NavbarComponent,
+    LoginComponent,
+    BookingsListComponent,
+    BookingFormComponent
+  ],
+  imports: [
+    BrowserModule,
+    BrowserAnimationsModule,
+    FormsModule,
+    ReactiveFormsModule,
+    CoreModule,
+    SharedModule,
+    AppRoutingModule
+  ],
+  bootstrap: [AppComponent]
+})
+export class AppModule {}
+
+
+---
+
+8) src/app/shared/material/material.module.ts
+
+import { NgModule } from '@angular/core';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTableModule } from '@angular/material/table';
+import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatSortModule } from '@angular/material/sort';
+import { MatDialogModule } from '@angular/material/dialog';
+import { MatSelectModule } from '@angular/material/select';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatNativeDateModule } from '@angular/material/core';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatListModule } from '@angular/material/list';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatRadioModule } from '@angular/material/radio';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDividerModule } from '@angular/material/divider';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+
+const MATS = [
+  MatToolbarModule, MatIconModule, MatButtonModule, MatCardModule, MatInputModule,
+  MatFormFieldModule, MatSnackBarModule, MatTableModule, MatPaginatorModule,
+  MatSortModule, MatDialogModule, MatSelectModule, MatDatepickerModule, MatNativeDateModule,
+  MatMenuModule, MatListModule, MatCheckboxModule, MatRadioModule, MatTooltipModule,
+  MatDividerModule, MatProgressSpinnerModule
+];
+
+@NgModule({
+  imports: MATS,
+  exports: MATS
+})
+export class MaterialModule {}
+
+
+---
+
+9) src/app/shared/shared.module.ts
+
+import { NgModule } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { MaterialModule } from './material/material.module';
+
+@NgModule({
+  imports: [CommonModule, MaterialModule],
+  exports: [CommonModule, MaterialModule]
+})
+export class SharedModule {}
+
+
+---
+
+10) src/app/core/core.module.ts
+
+import { NgModule, Optional, SkipSelf } from '@angular/core';
+import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
+import { AuthInterceptor } from './interceptors/auth.interceptor';
+
+@NgModule({
+  imports: [HttpClientModule],
+  providers: [{ provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }]
+})
+export class CoreModule {
+  constructor(@Optional() @SkipSelf() parent: CoreModule) {
+    if (parent) throw new Error('CoreModule loaded twice.');
+  }
+}
+
+
+---
+
+11) src/app/core/models/booking.model.ts
+
+export interface Booking {
+  id?: string;
+  tableName: string;
+  bookingDateTime: string; // ISO string
+  guests: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  gender: 'Male' | 'Female' | 'Other';
+  notes?: string;
+}
+
+
+---
+
+12) src/app/core/models/user.model.ts
+
+export interface User {
+  id: number;
+  email: string;
+  password: string;
+  name: string;
+}
+
+
+---
+
+13) src/app/core/services/auth.service.ts
+
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { tap, map } from 'rxjs/operators';
+import { Observable } from 'rxjs';
+import { User } from '../models/user.model';
+
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+  private base = 'http://localhost:3000';
+
+  constructor(private http: HttpClient) {}
+
+  login(email: string, password: string): Observable<boolean> {
+    return this.http.get<User[]>(`${this.base}/users?email=${encodeURIComponent(email)}`).pipe(
+      map(users => users[0] && users[0].password === password ? users[0] : null),
+      tap(user => {
+        if (user) {
+          localStorage.setItem('token', 'demo-token');
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+      }),
+      map(user => !!user)
+    );
+  }
+
+  logout(): void {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  }
+
+  isLoggedIn(): boolean {
+    return !!localStorage.getItem('token');
+  }
+}
+
+
+---
+
+14) src/app/core/services/booking.service.ts
+
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Booking } from '../models/booking.model';
+import { Observable, map } from 'rxjs';
+import { v4 as uuid } from 'uuid';
+
+@Injectable({ providedIn: 'root' })
+export class BookingService {
+  private base = 'http://localhost:3000';
+
+  constructor(private http: HttpClient) {}
+
+  getTables(): Observable<string[]> {
+    return this.http.get<{id: string}[]>(`${this.base}/tables`).pipe(map(t => t.map(x => x.id)));
+  }
+
+  list(): Observable<Booking[]> {
+    return this.http.get<Booking[]>(`${this.base}/bookings?_sort=bookingDateTime&_order=asc`);
+  }
+
+  get(id: string): Observable<Booking> {
+    return this.http.get<Booking>(`${this.base}/bookings/${id}`);
+  }
+
+  create(b: Booking): Observable<Booking> {
+    const withId = { ...b, id: uuid() };
+    return this.http.post<Booking>(`${this.base}/bookings`, withId);
+  }
+
+  update(id: string, b: Booking): Observable<Booking> {
+    return this.http.put<Booking>(`${this.base}/bookings/${id}`, b);
+  }
+
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/bookings/${id}`);
+  }
+
+  findConflicts(tableName: string, isoDateTime: string, ignoreId?: string) {
+    let params = new HttpParams().set('tableName', tableName).set('bookingDateTime', isoDateTime);
+    return this.http.get<Booking[]>(`${this.base}/bookings`, { params }).pipe(
+      map(list => list.filter(b => b.id !== ignoreId))
+    );
+  }
+}
+
+
+---
+
+15) src/app/core/guards/auth.guard.ts
+
+import { Injectable } from '@angular/core';
+import { CanActivate, Router, UrlTree } from '@angular/router';
+import { AuthService } from '../services/auth.service';
+
+@Injectable({ providedIn: 'root' })
+export class AuthGuard implements CanActivate {
+  constructor(private auth: AuthService, private router: Router) {}
+  canActivate(): boolean | UrlTree {
+    return this.auth.isLoggedIn() ? true : this.router.parseUrl('/login');
+  }
+}
+
+
+---
+
+16) src/app/core/interceptors/auth.interceptor.ts
+
+import { Injectable } from '@angular/core';
+import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    const token = localStorage.getItem('token');
+    return next.handle(token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req);
+  }
+}
+
+
+---
+
+17) src/app/layout/navbar/navbar.component.ts
+
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '../../core/services/auth.service';
+
+@Component({
+  selector: 'app-navbar',
+  templateUrl: './navbar.component.html',
+  styleUrls: ['./navbar.component.scss']
+})
+export class NavbarComponent {
+  constructor(private auth: AuthService, private router: Router) {}
+  isLoggedIn() { return this.auth.isLoggedIn(); }
+  logout() { this.auth.logout(); this.router.navigateByUrl('/login'); }
+}
+
+
+---
+
+18) src/app/layout/navbar/navbar.component.html
+
+<mat-toolbar>
+  <span class="logo">Hotel Admin</span>
+  <span class="spacer"></span>
+  <button mat-button routerLink="/bookings" *ngIf="isLoggedIn()">Bookings</button>
+  <button mat-button (click)="logout()" *ngIf="isLoggedIn()">Logout</button>
+  <button mat-raised-button color="primary" routerLink="/login" *ngIf="!isLoggedIn()">Login</button>
+</mat-toolbar>
+
+
+---
+
+19) src/app/layout/navbar/navbar.component.scss
+
+.spacer { flex: 1; }
+.logo { font-weight: 600; letter-spacing: .3px; }
+
+
+---
+
+20) src/app/features/auth/login/login.component.ts
+
+import { Component } from '@angular/core';
+import { FormBuilder, Validators } from '@angular/forms';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
+import { AuthService } from '../../../core/services/auth.service';
+
+@Component({
+  selector: 'app-login',
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.scss']
+})
+export class LoginComponent {
+  loading = false;
+  form = this.fb.group({
+    email: ['', [Validators.required, Validators.email]],
+    password: ['', Validators.required]
+  });
+
+  constructor(private fb: FormBuilder, private auth: AuthService, private router: Router, private sb: MatSnackBar) {}
+
+  submit() {
+    if (this.form.invalid) return;
+    this.loading = true;
+    const { email, password } = this.form.value as any;
+    this.auth.login(email, password).subscribe({
+      next: ok => {
+        this.loading = false;
+        if (ok) { this.router.navigateByUrl('/bookings'); }
+        else { this.sb.open('Invalid credentials', 'Close', { duration: 3000 }); }
+      },
+      error: () => { this.loading = false; this.sb.open('Login failed', 'Close', { duration: 3000 }); }
+    });
+  }
+}
+
+
+---
+
+21) src/app/features/auth/login/login.component.html
+
+<div class="card">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Admin Login</mat-card-title>
+      <mat-card-subtitle>Use admin@hotel.com / Admin@123</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Email</mat-label>
+          <input matInput formControlName="email" type="email" autocomplete="username">
+          <mat-error *ngIf="form.get('email')?.invalid">Valid email is required</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-100">
+          <mat-label>Password</mat-label>
+          <input matInput formControlName="password" type="password" autocomplete="current-password">
+          <mat-error *ngIf="form.get('password')?.invalid">Password is required</mat-error>
+        </mat-form-field>
+
+        <button mat-raised-button color="primary" class="w-100" [disabled]="form.invalid || loading">
+          {{ loading ? 'Signing in...' : 'Login' }}
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>
+
+
+---
+
+22) src/app/features/auth/login/login.component.scss
+
+.w-100 { width: 100%; }
+.card { max-width: 440px; margin: 40px auto; }
+
+
+---
+
+23) src/app/features/bookings/bookings-list/bookings-list.component.ts
+
+import { Component, OnInit } from '@angular/core';
+import { BookingService } from '../../../core/services/booking.service';
+import { Booking } from '../../../core/models/booking.model';
+import { MatSnackBar } from '@angular/material/snack-bar';
+
+@Component({
+  selector: 'app-bookings-list',
+  templateUrl: './bookings-list.component.html',
+  styleUrls: ['./bookings-list.component.scss']
+})
+export class BookingsListComponent implements OnInit {
+  data: Booking[] = [];
+  cols = ['tableName','bookingDateTime','guest','email','actions'];
+
+  constructor(private api: BookingService, private sb: MatSnackBar) {}
+
+  ngOnInit() { this.load(); }
+
+  load() { this.api.list().subscribe(d => this.data = d); }
+
+  confirmDelete(id: string) {
+    if (!confirm('Delete this booking?')) return;
+    this.api.delete(id).subscribe({
+      next: () => { this.sb.open('Deleted', 'Close', { duration: 2000 }); this.load(); },
+      error: () => this.sb.open('Delete failed', 'Close', { duration: 3000 })
+    });
+  }
+}
+
+
+---
+
+24) src/app/features/bookings/bookings-list/bookings-list.component.html
+
+<mat-card>
+  <mat-card-title>Hotel Table Bookings</mat-card-title>
+  <mat-card-subtitle>
+    <button mat-raised-button color="primary" routerLink="/bookings/new">Add Booking</button>
+  </mat-card-subtitle>
+
+  <div class="table-wrap">
+    <table mat-table [dataSource]="data">
+      <ng-container matColumnDef="tableName">
+        <th mat-header-cell *matHeaderCellDef> Table </th>
+        <td mat-cell *matCellDef="let b"> {{ b.tableName }} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="bookingDateTime">
+        <th mat-header-cell *matHeaderCellDef> Date & Time </th>
+        <td mat-cell *matCellDef="let b"> {{ b.bookingDateTime | date:'medium' }} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="guest">
+        <th mat-header-cell *matHeaderCellDef> Guest </th>
+        <td mat-cell *matCellDef="let b"> {{ b.firstName }} {{ b.lastName }} ({{ b.guests }}) </td>
+      </ng-container>
+
+      <ng-container matColumnDef="email">
+        <th mat-header-cell *matHeaderCellDef> Email </th>
+        <td mat-cell *matCellDef="let b"> {{ b.email }} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef> Actions </th>
+        <td mat-cell *matCellDef="let b">
+          <button mat-button color="primary" [routerLink]="['/bookings', b.id, 'edit']">Edit</button>
+          <button mat-button color="warn" (click)="confirmDelete(b.id!)">Delete</button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="cols"></tr>
+      <tr mat-row *matRowDef="let row; columns: cols;"></tr>
+    </table>
+  </div>
+</mat-card>
+
+
+---
+
+25) src/app/features/bookings/bookings-list/bookings-list.component.scss
+
+.table-wrap { overflow: auto; }
+table { width: 100%; }
+
+
+---
+
+26) src/app/features/bookings/booking-form/booking-form.component.ts
+
+import { Component, OnInit } from '@angular/core';
+import { FormBuilder, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { BookingService } from '../../../core/services/booking.service';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { Booking } from '../../../core/models/booking.model';
+
+function hhmmValidator(ctrl: AbstractControl): ValidationErrors | null {
+  const v = (ctrl.value || '').trim();
+  return /^[0-2]\d:[0-5]\d$/.test(v) ? null : { time: true };
+}
+
+@Component({
+  selector: 'app-booking-form',
+  templateUrl: './booking-form.component.html',
+  styleUrls: ['./booking-form.component.scss']
+})
+export class BookingFormComponent implements OnInit {
+  isEdit = false;
+  id?: string;
+  tables: string[] = [];
+  saving = false;
+  conflictMsg = '';
+
+  form = this.fb.group({
+    tableName: ['', Validators.required],
+    date: [null, Validators.required],      // Date only
+    time: ['', [Validators.required, hhmmValidator]], // HH:mm
+    guests: [2, [Validators.required, Validators.min(1)]],
+    firstName: ['', Validators.required],
+    lastName: ['', Validators.required],
+    email: ['', [Validators.required, Validators.email]],
+    gender: ['Male', Validators.required],
+    notes: ['']
+  });
+
+  constructor(
+    private fb: FormBuilder,
+    private route: ActivatedRoute,
+    private router: Router,
+    private api: BookingService,
+    private sb: MatSnackBar
+  ) {}
+
+  ngOnInit(): void {
+    this.api.getTables().subscribe(t => this.tables = t);
+
+    this.id = this.route.snapshot.paramMap.get('id') || undefined;
+    this.isEdit = !!this.id;
+
+    if (this.isEdit && this.id) {
+      this.api.get(this.id).subscribe(b => {
+        const dt = new Date(b.bookingDateTime);
+        this.form.patchValue({
+          tableName: b.tableName,
+          date: dt,
+          time: dt.toISOString().substring(11,16),
+          guests: b.guests,
+          firstName: b.firstName,
+          lastName: b.lastName,
+          email: b.email,
+          gender: b.gender,
+          notes: b.notes || ''
+        });
+      });
+    }
+  }
+
+  private buildISO(): string {
+    const d: Date = this.form.value.date as any;
+    const [h, m] = (this.form.value.time as string).split(':').map(Number);
+    const dt = new Date(d);
+    dt.setHours(h, m, 0, 0);
+    return dt.toISOString();
+  }
+
+  private toBooking(): Booking {
+    return {
+      id: this.id,
+      tableName: this.form.value.tableName!,
+      bookingDateTime: this.buildISO(),
+      guests: this.form.value.guests!,
+      firstName: this.form.value.firstName!,
+      lastName: this.form.value.lastName!,
+      email: this.form.value.email!,
+      gender: this.form.value.gender! as any,
+      notes: this.form.value.notes || ''
+    };
+  }
+
+  save() {
+    if (this.form.invalid) return;
+    const payload = this.toBooking();
+    this.saving = true;
+
+    this.api.findConflicts(payload.tableName, payload.bookingDateTime, this.id).subscribe(conflicts => {
+      if (conflicts.length) {
+        this.saving = false;
+        this.conflictMsg = 'This table is already booked at the selected date & time.';
+        this.sb.open(this.conflictMsg, 'Close', { duration: 3500 });
+        return;
+      }
+      const req = this.isEdit && this.id
+        ? this.api.update(this.id, payload)
+        : this.api.create(payload);
+
+      req.subscribe({
+        next: () => {
+          this.sb.open('Saved successfully', 'Close', { duration: 2000 });
+          this.router.navigateByUrl('/bookings');
+        },
+        error: () => {
+          this.saving = false;
+          this.sb.open('Save failed', 'Close', { duration: 3000 });
+        }
+      });
+    });
+  }
+}
+
+
+---
+
+27) src/app/features/bookings/booking-form/booking-form.component.html
+
+<mat-card>
+  <mat-card-title>{{ isEdit ? 'Edit Booking' : 'Add Booking' }}</mat-card-title>
+
+  <form [formGroup]="form" (ngSubmit)="save()">
+    <div class="grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Table</mat-label>
+        <mat-select formControlName="tableName" required>
+          <mat-option *ngFor="let t of tables" [value]="t">{{ t }}</mat-option>
+        </mat-select>
+        <mat-error *ngIf="form.get('tableName')?.invalid">Required</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Booking Date & Time</mat-label>
+        <input matInput [matDatepicker]="picker" formControlName="date" required>
+        <mat-datepicker #picker></mat-datepicker>
+        <mat-error *ngIf="form.get('date')?.invalid">Required</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Time (24h HH:MM)</mat-label>
+        <input matInput placeholder="19:30" formControlName="time" required>
+        <mat-error *ngIf="form.get('time')?.invalid">HH:MM</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Guests</mat-label>
+        <input matInput type="number" min="1" max="20" formControlName="guests">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>First Name</mat-label>
+        <input matInput formControlName="firstName" required>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Last Name</mat-label>
+        <input matInput formControlName="lastName" required>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Email</mat-label>
+        <input matInput type="email" formControlName="email" required>
+        <mat-error *ngIf="form.get('email')?.invalid">Valid email required</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Gender</mat-label>
+        <mat-select formControlName="gender" required>
+          <mat-option value="Male">Male</mat-option>
+          <mat-option value="Female">Female</mat-option>
+          <mat-option value="Other">Other</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field class="wide" appearance="outline">
+        <mat-label>Notes</mat-label>
+        <textarea matInput formControlName="notes" rows="3"></textarea>
+      </mat-form-field>
+    </div>
+
+    <div class="actions">
+      <button mat-stroked-button routerLink="/bookings">Cancel</button>
+      <button mat-raised-button color="primary" [disabled]="form.invalid || saving">
+        {{ saving ? 'Saving...' : 'Submit' }}
+      </button>
+    </div>
+
+    <mat-divider></mat-divider>
+    <mat-hint *ngIf="conflictMsg" class="conflict">{{ conflictMsg }}</mat-hint>
+  </form>
+</mat-card>
+
+
+---
+
+28) src/app/features/bookings/booking-form/booking-form.component.scss
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 16px;
+}
+.wide { grid-column: 1 / -1; }
+.actions { margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end; }
+.conflict { color: #b00020; font-weight: 600; }
+@media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+
+---
+
+29) src/app/layout/navbar/index.ts (optional, not required)
+
+Omit unless you prefer barrel files.
+
+
+---
+
+Run
+
+Terminal 1:
+
+npm run api
+
+Terminal 2:
+
+npm start
+
+Login with admin@hotel.com / Admin@123.
+
+If you want me to also add feature modules (features/auth.module.ts, features/bookings.module.ts) and wire them (not strictly required here), or convert Add/Edit to a Material dialog modal, say so and I’ll drop those files too.
+
