@@ -1,0 +1,202 @@
+Got it ✅ — the issue comes from two small but important parts:
+
+1. Route param handling: In the booking form we need to subscribe to route params so Angular reacts when you click “Edit” → navigates to /bookings/:id.
+
+
+2. Form patch: Patch values only after you actually fetch the booking.
+
+
+3. Button label: Use *ngIf or conditionally render based on id.
+
+
+
+Below is the complete fixed code for the form (TS + HTML) so that:
+
+When you click Edit, the form is prefilled.
+
+The button shows Update instead of Submit.
+
+Works both for Add and Edit.
+
+
+
+---
+
+✅ booking-form.component.ts
+
+import { Component, OnInit } from '@angular/core';
+import { FormBuilder, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { BookingService } from '../booking.service';
+import { ToastrService } from 'ngx-toastr';
+import { Booking } from '../../../shared/models/booking.model';
+
+@Component({
+  selector: 'app-booking-form',
+  templateUrl: './booking-form.component.html'
+})
+export class BookingFormComponent implements OnInit {
+  id?: number;
+  tables: { id: number; name: string }[] = [];
+  loading = false;
+
+  form = this.fb.group({
+    tableName: ['', Validators.required],
+    bookingDateTime: ['', Validators.required],
+    firstName: ['', Validators.required],
+    lastName: ['', Validators.required],
+    email: ['', [Validators.required, Validators.email]],
+    gender: ['Male', Validators.required],
+    guests: [1, [Validators.required, Validators.min(1)]]
+  });
+
+  constructor(
+    private fb: FormBuilder,
+    private route: ActivatedRoute,
+    private router: Router,
+    private api: BookingService,
+    private toast: ToastrService
+  ) {}
+
+  ngOnInit(): void {
+    // Load tables for dropdown
+    this.api.getTables().subscribe(t => (this.tables = t));
+
+    // Subscribe to route params (important!)
+    this.route.paramMap.subscribe(params => {
+      const paramId = params.get('id');
+      if (paramId) {
+        this.id = +paramId;
+        this.loadBooking(this.id);
+      }
+    });
+  }
+
+  loadBooking(id: number) {
+    this.loading = true;
+    this.api.get(id).subscribe({
+      next: booking => {
+        // convert datetime to 'yyyy-MM-ddTHH:mm' for datetime-local input
+        const formatted = {
+          ...booking,
+          bookingDateTime: booking.bookingDateTime.slice(0, 16)
+        };
+        this.form.patchValue(formatted);
+        this.loading = false;
+      },
+      error: () => {
+        this.toast.error('Booking not found');
+        this.router.navigate(['/bookings']);
+      }
+    });
+  }
+
+  submit() {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+    const data: Booking = this.form.value as Booking;
+
+    this.loading = true;
+    const request = this.id
+      ? this.api.update(this.id, data)
+      : this.api.create(data);
+
+    request.subscribe({
+      next: () => {
+        this.toast.success(this.id ? 'Booking updated' : 'Booking added');
+        this.router.navigate(['/bookings']);
+      },
+      error: err => {
+        this.loading = false;
+        const msg = err?.message?.includes('already booked')
+          ? 'Error: table already booked at that time'
+          : 'Save failed';
+        this.toast.error(msg);
+      }
+    });
+  }
+}
+
+
+---
+
+✅ booking-form.component.html
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h4 class="card-title">{{ id ? 'Edit Booking' : 'Add Booking' }}</h4>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="row g-3 mt-1">
+      <div class="col-md-6">
+        <label class="form-label">Table</label>
+        <select class="form-select" formControlName="tableName">
+          <option value="" disabled>Select a table</option>
+          <option *ngFor="let t of tables" [value]="t.name">{{ t.name }}</option>
+        </select>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Booking Date & Time</label>
+        <input type="datetime-local" class="form-control" formControlName="bookingDateTime">
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">First Name</label>
+        <input class="form-control" formControlName="firstName">
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Last Name</label>
+        <input class="form-control" formControlName="lastName">
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-control" formControlName="email">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">Gender</label>
+        <select class="form-select" formControlName="gender">
+          <option>Male</option>
+          <option>Female</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label">No. of Guests</label>
+        <input type="number" min="1" class="form-control" formControlName="guests">
+      </div>
+
+      <div class="col-12">
+        <button class="btn btn-primary" [disabled]="loading">
+          {{ id ? (loading ? 'Updating...' : 'Update') : (loading ? 'Saving...' : 'Submit') }}
+        </button>
+        <a routerLink="/bookings" class="btn btn-outline-secondary ms-2">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+---
+
+🔑 Key Fixes
+
+this.route.paramMap.subscribe → ensures form reloads when you navigate via Edit.
+
+slice(0,16) → datetime-local requires YYYY-MM-DDTHH:mm, so we trim the ISO string.
+
+Conditional button text → shows Update when id exists.
+
+
+
+---
+
+👉 Replace your old booking-form.component.ts and .html with this, and the edit mode will work correctly.
+
+Do you also want me to update the list page so that clicking Edit immediately loads the form without needing manual refresh?
+
